@@ -174,3 +174,35 @@ export function composeMerchRequest(fields = {}, references = {}) {
 
   return { prompt, inputs: ordered.map(({ mimeType, dataBase64 }) => ({ mimeType, dataBase64 })) }
 }
+
+/**
+ * Prompt for revising an existing image.
+ *
+ * Image models do not edit in place: the previous image goes back in as a
+ * reference and the whole picture is regenerated. So the prompt has to say
+ * what to keep as well as what to change — asking only for the change tends
+ * to produce a picture that satisfies the instruction and quietly drops
+ * something that was right before. Moving a flag "to one side" without
+ * saying "still held" returns a flag floating in mid-air.
+ */
+export function composeEditPrompt(instruction, { originalPrompt = '' } = {}) {
+  const clean = String(instruction ?? '').trim()
+  if (!clean) {
+    throw new Error('An edit needs an instruction')
+  }
+
+  const clauses = [
+    'Revise the attached image.',
+    `Change: ${clean}`,
+    'Keep everything else exactly as it is — the same subject, product, framing, '
+      + 'lighting, colours and style. Change only what was asked for.',
+  ]
+
+  // The original brief, when known, re-states the intent the edit must not
+  // undo (a person holding the product, say).
+  if (String(originalPrompt).trim()) {
+    clauses.push(`The image was originally made for this brief, which still applies: ${String(originalPrompt).trim()}`)
+  }
+
+  return clauses.join(' ')
+}

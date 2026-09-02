@@ -14,6 +14,7 @@ import {
   composeMerchPrompt,
   composeMerchRequest,
   composeReferences,
+  composeEditPrompt,
 } from '../../src/services/MerchPromptService.js'
 
 vi.mock('stripe', () => ({
@@ -181,5 +182,68 @@ describe('POST /api/admin/ai/generate-merch-image', () => {
     expect(res.status).toBe(503)
     expect(body.error).toMatch(/could not be saved/i)
     expect(body.error).toMatch(/R2/i)
+  })
+})
+
+describe('POST /api/admin/ai/edit-image', () => {
+  let app
+  let env
+  let kv
+  let adminToken
+
+  beforeEach(async () => {
+    app = await createTestApp()
+    env = createMockEnv()
+    kv = createMockKV()
+    env.TEST_KV = kv
+    adminToken = await createAdminToken(env, kv)
+    vi.restoreAllMocks()
+  })
+
+  function edit(body) {
+    return executeRequest(app, createTestRequest('/api/admin/ai/edit-image', {
+      method: 'POST',
+      headers: createAdminHeaders(adminToken),
+      body: JSON.stringify(body),
+    }), env)
+  }
+
+  it('needs both an image and an instruction', async () => {
+    expect((await edit({ instruction: 'move it' })).status).toBe(400)
+    expect((await edit({ url: '/api/images/x.png' })).status).toBe(400)
+  })
+
+  it('rejects a url outside the store\'s own images', async () => {
+    // A caller-supplied path must not become a way to read arbitrary keys
+    // or make the worker fetch a remote URL.
+    for (const url of [
+      'https://example.com/evil.png',
+      '/api/images/../../secret',
+      '/etc/passwd',
+      '/api/admin/products',
+    ]) {
+      const res = await edit({ url, instruction: 'change it' })
+      expect(res.status).toBe(400)
+    }
+  })
+
+  it('preserves the rest of the image in the prompt it sends', () => {
+    const prompt = composeEditPrompt('move the flag to his left')
+
+    expect(prompt).toContain('move the flag to his left')
+    // Asking only for the change tends to drop something that was right:
+    // moving a flag "to one side" without "still held" returns it floating.
+    expect(prompt).toMatch(/keep everything else/i)
+  })
+
+  it('carries the original brief forward so an edit cannot undo it', () => {
+    const prompt = composeEditPrompt('move the flag', {
+      originalPrompt: 'It is shown with the person from the reference image.',
+    })
+    expect(prompt).toContain('shown with the person from the reference image')
+  })
+
+  it('refuses an empty instruction', () => {
+    expect(() => composeEditPrompt('   ')).toThrow(/instruction/i)
   })
 })
