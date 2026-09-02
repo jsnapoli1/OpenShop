@@ -103,16 +103,47 @@ describe('Merch prompt composition', () => {
     // model comes before logo in REFERENCE_ROLES
     expect(inputs[0].mimeType).toBe('image/jpeg')
     expect(prompt).toContain('Image 1 is the person who should appear with the item')
-    expect(prompt).toContain('Image 2 is the artwork or logo')
+    expect(prompt).toContain('Image 2 is the brand mark')
+  })
+
+  it('treats the brand as a design brief when an artistic style is given', () => {
+    // Without this the prompt said "Printed on the item: <logo>", which
+    // produced a flat transfer of the existing mark onto a blank garment
+    // rather than a designed garment graphic.
+    const prompt = composeMerchPrompt({
+      product: 'an oversized tee',
+      logo: 'Blue Mountain Cross Country Camp',
+      style: 'vintage screenprint, halftone texture',
+    })
+    expect(prompt).toMatch(/design an original garment graphic/i)
+    expect(prompt).toMatch(/vintage screenprint/i)
+    expect(prompt).toMatch(/do not paste the logo on unchanged/i)
+    expect(prompt).not.toMatch(/printed on the item/i)
+  })
+
+  it('reproduces the mark as-is when no style is given', () => {
+    // Reproducing a logo faithfully is still the right default.
+    const prompt = composeMerchPrompt({ product: 'a tee', logo: 'the camp crest' })
+    expect(prompt).toMatch(/printed on the item/i)
+    expect(prompt).not.toMatch(/design an original/i)
+  })
+
+  it('uses a style reference image even when the style field is blank', () => {
+    const { prompt } = composeMerchRequest(
+      { product: 'a tee', logo: 'the camp crest' },
+      { style: ref() },
+    )
+    expect(prompt).toMatch(/artistic style of the style reference image/i)
+    expect(prompt).toMatch(/Image 1 is an artistic reference/i)
   })
 
   it('caps references at the generator limit', () => {
     const many = composeReferences({
-      model: ref(), product: ref(), logo: ref(), extra: ref(), other: ref(),
+      model: ref(), product: ref(), logo: ref(), style: ref(), extra: ref(), other: ref(),
     })
     // Only known roles are kept, and never more than the cap.
     expect(many.length).toBeLessThanOrEqual(4)
-    expect(many.every((r) => ['model', 'product', 'logo'].includes(r.role))).toBe(true)
+    expect(many.every((r) => ['model', 'product', 'logo', 'style'].includes(r.role))).toBe(true)
   })
 
   it('ignores a reference with no image data', () => {

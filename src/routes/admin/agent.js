@@ -44,6 +44,9 @@ function buildSystemPrompt({ hasReferences = false } = {}) {
       + 'does not apply; never write "none", "N/A" or an explanation, which would be read as a '
       + 'description of what to draw.',
     'If the user asks for someone wearing or holding the product, always fill the model field.',
+    'When the user wants designed brand artwork rather than their logo reproduced as-is, fill the '
+      + 'style field with the artistic direction. The brand is then redrawn in that style instead '
+      + 'of being pasted on flat.',
     'When the user wants to change an image they have already seen — reframe it, move something, '
       + 'fix a detail — call edit_product_image with that image\'s url rather than generating a '
       + 'new one, so the rest of the picture is preserved. If the image is already on a product, '
@@ -125,7 +128,20 @@ const TOOL_DEFINITIONS = [
               + 'Do not write "none" or explain why it is absent — the text is used verbatim in the image prompt.',
           },
           product: { type: 'string', description: 'The garment or product, e.g. "a heather grey hoodie"' },
-          logo: { type: 'string', description: 'What is printed on the item' },
+          logo: {
+            type: 'string',
+            description:
+              'The brand to express on the item — its name, tagline and motifs. When an '
+              + 'artistic style is also given, this is treated as a brief for an original '
+              + 'graphic rather than a logo to paste on unchanged.',
+          },
+          style: {
+            type: 'string',
+            description:
+              'The artistic direction for the graphic, e.g. "vintage screenprint, halftone '
+              + 'texture, muted palette". Setting this makes the brand mark be redrawn in '
+              + 'that style rather than reproduced as-is.',
+          },
         },
         required: [],
       },
@@ -401,6 +417,7 @@ async function executeTool(c, name, args) {
           pose: a.pose ?? '',
           product: a.product ?? '',
           logo: a.logo ?? '',
+          style: a.style ?? '',
           references: c.get('merchReferences') || {},
         }),
       })
