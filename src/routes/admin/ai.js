@@ -44,7 +44,8 @@ router.post('/generate-image', asyncHandler(async (c) => {
   //
   // Overridable so a store can move to a cheaper or newer model (for example
   // gemini-3.1-flash-lite-image) without waiting on a release.
-  const model = c.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image'
+  const model = (await resolveSetting(kvNamespace, c.env, 'GEMINI_IMAGE_MODEL'))
+    || 'gemini-3.1-flash-image'
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`
   const res = await fetch(endpoint, {
     method: 'POST',
