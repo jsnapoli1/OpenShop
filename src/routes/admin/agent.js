@@ -44,6 +44,10 @@ function buildSystemPrompt({ hasReferences = false } = {}) {
       + 'does not apply; never write "none", "N/A" or an explanation, which would be read as a '
       + 'description of what to draw.',
     'If the user asks for someone wearing or holding the product, always fill the model field.',
+    'When the user wants to change an image they have already seen — reframe it, move something, '
+      + 'fix a detail — call edit_product_image with that image\'s url rather than generating a '
+      + 'new one, so the rest of the picture is preserved. If the image is already on a product, '
+      + 'call update_product afterwards with the new url.',
     hasReferences
       ? 'The user attached reference images. They are passed to generate_product_image automatically; '
         + 'you do not need to describe or upload them.'
@@ -124,6 +128,30 @@ const TOOL_DEFINITIONS = [
           logo: { type: 'string', description: 'What is printed on the item' },
         },
         required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'edit_product_image',
+      description:
+        'Revise an image that was already generated — reframe it, move something, change a '
+        + 'colour. Pass the url returned by generate_product_image (or a product\'s imageUrl). '
+        + 'Returns a new url; the original is left untouched. Use this rather than generating '
+        + 'again from scratch when the user is refining an image they have already seen.',
+      parameters: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: 'The /api/images/... url of the image to revise' },
+          instruction: {
+            type: 'string',
+            description:
+              'What to change, e.g. "move the flag to his left so it does not cross his body". '
+              + 'Describe only the change; everything else is preserved automatically.',
+          },
+        },
+        required: ['url', 'instruction'],
       },
     },
   },
@@ -298,6 +326,8 @@ export function summarizeResult(action, result) {
   switch (action.tool) {
     case 'generate_product_image':
       return b?.url ? `Generated an image: ${b.url}` : 'Generated an image'
+    case 'edit_product_image':
+      return b?.url ? `Revised the image: ${b.url}` : 'Revised the image'
     case 'create_product':
       return `Created product "${b?.name}" (${b?.id})`
     case 'update_product':
@@ -374,6 +404,21 @@ async function executeTool(c, name, args) {
           references: c.get('merchReferences') || {},
         }),
       })
+      if (r.ok && r.body?.prompt) c.set('lastImagePrompt', r.body.prompt)
+      return { status: r.status, data: r.body }
+    }
+    case 'edit_product_image': {
+      const r = await dispatch(c, '/api/admin/ai/edit-image', {
+        method: 'POST',
+        body: JSON.stringify({
+          url: a.url,
+          instruction: a.instruction,
+          // Carries the intent of the original brief so an edit does not
+          // quietly undo it.
+          originalPrompt: c.get('lastImagePrompt') || '',
+        }),
+      })
+      if (r.ok && r.body?.prompt) c.set('lastImagePrompt', r.body.prompt)
       return { status: r.status, data: r.body }
     }
     case 'update_product': {
