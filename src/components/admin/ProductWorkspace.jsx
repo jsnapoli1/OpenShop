@@ -7,7 +7,7 @@ import { Select } from "../ui/select"
 import { Input } from "../ui/input"
 import { Textarea } from "../ui/textarea"
 import { Switch } from "../ui/switch"
-import { RefreshCcw, Plus, Save, Trash2, CheckCircle2, AlertTriangle, Package } from "lucide-react"
+import { RefreshCcw, Plus, Save, Trash2, CheckCircle2, AlertTriangle, Package, Wand2 } from "lucide-react"
 import { AdminImage } from "./AdminImage"
 import {
   AlertDialog,
@@ -20,6 +20,7 @@ import {
   AlertDialogCancel,
 } from "../ui/alert-dialog"
 import ImageUrlField from "./ImageUrlField"
+import ReviseImageModal from "./ReviseImageModal"
 import VariantImageSelector from "./VariantImageSelector"
 import { adminApiRequest } from "../../lib/auth"
 import { formatCurrency, normalizeImageUrl, generateId } from "../../lib/utils"
@@ -290,6 +291,7 @@ export function ProductWorkspace() {
   const [isSaving, setIsSaving] = useState(false)
   const [status, setStatus] = useState(null)
   const [modalImage, setModalImage] = useState(null)
+  const [reviseIndex, setReviseIndex] = useState(null)
   const [variants1Enabled, setVariants1Enabled] = useState(false)
   const [variants2Enabled, setVariants2Enabled] = useState(false)
   const [storeSettings, setStoreSettings] = useState(null)
@@ -1150,6 +1152,19 @@ export function ProductWorkspace() {
                               : undefined
                           }
                         />
+                        {/* Only offered for images this store generated: the
+                            endpoint reads them back out of R2 by key, so a
+                            linked external image cannot be revised. */}
+                        {String(image || "").startsWith("/api/images/") && (
+                          <button
+                            type="button"
+                            onClick={() => setReviseIndex(index)}
+                            className="inline-flex items-center gap-1 text-xs text-[var(--admin-accent-light)] hover:underline"
+                          >
+                            <Wand2 className="h-3.5 w-3.5" />
+                            Make image revisions
+                          </button>
+                        )}
                       </div>
                     ))}
                     <Button
@@ -1239,6 +1254,18 @@ export function ProductWorkspace() {
           )}
         </section>
       </div>
+
+      <ReviseImageModal
+        open={reviseIndex !== null}
+        imageUrl={reviseIndex !== null ? (draft.images || [])[reviseIndex] : undefined}
+        onClose={() => setReviseIndex(null)}
+        onApply={(url) => {
+          // Point this slot at the revision. The draft still has to be saved,
+          // so the change is reviewable rather than applied behind your back.
+          if (reviseIndex !== null) handleImageChange(reviseIndex, url)
+          setReviseIndex(null)
+        }}
+      />
 
       {modalImage && (
         <div

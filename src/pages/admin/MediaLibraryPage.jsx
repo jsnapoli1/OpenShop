@@ -4,8 +4,9 @@ import { Card, CardContent } from '../../components/ui/card'
 import { normalizeImageUrl } from '../../lib/utils'
 import { AdminImage } from '../../components/admin/AdminImage'
 import { adminApiRequest } from '../../lib/auth'
-import { Plus, Trash2, Image as ImageIcon, X, Copy } from 'lucide-react'
+import { Plus, Trash2, Image as ImageIcon, X, Copy, Wand2 } from 'lucide-react'
 import AddMediaModal from '../../components/admin/AddMediaModal'
+import ReviseImageModal from '../../components/admin/ReviseImageModal'
 import {
   AlertDialog,
   AlertDialogContent,
@@ -22,6 +23,7 @@ export function MediaLibraryPage() {
   const [selected, setSelected] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
   const [mediaToDelete, setMediaToDelete] = useState(null)
+  const [reviseTarget, setReviseTarget] = useState(null)
   const [status, setStatus] = useState('')
 
   useEffect(() => {
@@ -173,6 +175,18 @@ export function MediaLibraryPage() {
                 >
                   Copy URL
                 </button>
+                {/* Only images this store generated can be revised — the
+                    endpoint reads them back out of R2 by key. */}
+                {String(selected.url || '').startsWith('/api/images/') && (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 text-[var(--admin-accent-light)] hover:underline"
+                    onClick={() => setReviseTarget(selected)}
+                  >
+                    <Wand2 className="h-3.5 w-3.5" />
+                    Make image revisions
+                  </button>
+                )}
                 <button
                   type="button"
                   className="text-[var(--admin-error)] hover:underline"
@@ -185,6 +199,19 @@ export function MediaLibraryPage() {
           </div>
         </div>
       )}
+
+      <ReviseImageModal
+        open={Boolean(reviseTarget)}
+        imageUrl={reviseTarget?.url}
+        onClose={() => setReviseTarget(null)}
+        onApply={() => {
+          // The revision is saved to the library as its own item, so just
+          // reload rather than mutating the selected one.
+          setReviseTarget(null)
+          setSelected(null)
+          load()
+        }}
+      />
 
       <AddMediaModal
         open={addOpen}
