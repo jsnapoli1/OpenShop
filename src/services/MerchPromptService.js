@@ -28,10 +28,37 @@ export const REFERENCE_ROLES = ['model', 'product', 'logo']
  */
 export const MAX_REFERENCES = 4
 
+/**
+ * Values a model writes into a field when it means "not applicable".
+ *
+ * An LLM filling these fields does not leave one blank — it explains itself,
+ * writing "none - it's a flag, not worn by a person" into `model`. Composed
+ * naively that became "It is worn by none - it's a flag, not worn by a
+ * person", which reads to an image model as an instruction to include a
+ * person, and produced a flat product shot with the model silently dropped.
+ */
+const NEGATION_PATTERN = /^\s*(none|n\/?a|not applicable|no |nobody|no one|null|undefined|empty|-|—)\b/i
+
+/**
+ * Treat an explained "not applicable" as blank.
+ *
+ * Deliberately matched at the start only: "no one is wearing it" is a
+ * negation, while "a runner with no shirt" is a real description that
+ * happens to contain the word.
+ */
+function meaningful(value) {
+  const trimmed = String(value ?? '').trim()
+  if (!trimmed) return ''
+  if (NEGATION_PATTERN.test(trimmed)) return ''
+  return trimmed
+}
+
 function describeRole(role) {
   switch (role) {
     case 'model':
-      return 'the person who should be wearing the item'
+      // Not "wearing": the same field covers a flag being held and a mug
+      // being carried, and the narrower word steered the generator wrong.
+      return 'the person who should appear with the item'
     case 'product':
       return 'the blank garment or product being sold'
     case 'logo':
@@ -54,30 +81,53 @@ export function composeMerchPrompt({
   pose = '',
   product = '',
   logo = '',
-} = {}) {
+} = {}, { hasModelReference = false } = {}) {
   const clauses = []
 
-  const subject = product.trim() || 'the product'
+  const cleanModel = meaningful(model)
+  const cleanPose = meaningful(pose)
+  const cleanProduct = meaningful(product)
+  const cleanLogo = meaningful(logo)
+  const cleanDescription = meaningful(description)
+
+  const subject = cleanProduct || 'the product'
   clauses.push(`A product photograph of ${subject}.`)
 
-  if (model.trim()) {
-    clauses.push(`It is worn by ${model.trim()}.`)
+  // An uploaded model image is itself a request for a person, even when the
+  // text field is blank — that is the whole point of attaching it. Without
+  // this, the prompt captioned the reference but never asked for a person,
+  // and "product photograph ... product clearly visible" pulled the result
+  // toward a flat product shot with the reference ignored.
+  if (cleanModel) {
+    // "worn by" is wrong for anything not clothing — a flag or mug is held.
+    // The generic phrasing covers both without classifying the product.
+    clauses.push(`It is shown with ${cleanModel}.`)
+  } else if (hasModelReference) {
+    clauses.push('It is shown with the person from the reference image.')
   }
-  if (pose.trim()) {
-    clauses.push(`Pose: ${pose.trim()}.`)
-  } else if (model.trim()) {
-    // Only meaningful when there is a model reference to inherit a pose from.
+  if (cleanPose) {
+    clauses.push(`Pose: ${cleanPose}.`)
+  } else if (hasModelReference) {
+    // Only say this when there is actually an image to inherit a pose from.
+    // Referring to a reference image that was never supplied invites the
+    // generator to invent one.
     clauses.push('Keep the pose and framing from the reference image.')
   }
-  if (logo.trim()) {
-    clauses.push(`Printed on the item: ${logo.trim()}.`)
+  if (cleanLogo) {
+    clauses.push(`Printed on the item: ${cleanLogo}.`)
   }
-  if (description.trim()) {
-    clauses.push(description.trim())
+  if (cleanDescription) {
+    clauses.push(cleanDescription)
   }
 
+  // A person in the shot means it is a lifestyle photograph, not a cut-out.
+  // Demanding a "plain uncluttered background" in that case fought the
+  // reference image and helped produce a bare product on grey.
+  const wantsPerson = Boolean(cleanModel) || hasModelReference
   clauses.push(
-    'Photorealistic, evenly lit, plain uncluttered background, the product clearly visible and in focus.',
+    wantsPerson
+      ? 'Photorealistic lifestyle photograph, evenly lit, the person and the product both clearly visible and in focus.'
+      : 'Photorealistic, evenly lit, plain uncluttered background, the product clearly visible and in focus.',
   )
 
   return clauses.join(' ')
@@ -111,7 +161,9 @@ export function composeReferences(references = {}) {
  */
 export function composeMerchRequest(fields = {}, references = {}) {
   const ordered = composeReferences(references)
-  let prompt = composeMerchPrompt(fields)
+  let prompt = composeMerchPrompt(fields, {
+    hasModelReference: ordered.some((r) => r.role === 'model'),
+  })
 
   if (ordered.length > 0) {
     const legend = ordered

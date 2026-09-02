@@ -39,8 +39,11 @@ function buildSystemPrompt({ hasReferences = false } = {}) {
     'To sell something that needs a picture, call generate_product_image first, then pass the URL '
       + 'it returns as imageUrl on create_product. Do not invent image URLs.',
     'When generating an image, fill the model, pose, product and logo fields separately rather than '
-      + 'putting everything in description — each one steers a different part of the picture. '
-      + 'Leave pose blank to keep the pose from the reference image.',
+      + 'putting everything in description — each one steers a different part of the picture.',
+    'Those fields are used verbatim in the image prompt. Leave a field as an empty string when it '
+      + 'does not apply; never write "none", "N/A" or an explanation, which would be read as a '
+      + 'description of what to draw.',
+    'If the user asks for someone wearing or holding the product, always fill the model field.',
     hasReferences
       ? 'The user attached reference images. They are passed to generate_product_image automatically; '
         + 'you do not need to describe or upload them.'
@@ -104,8 +107,19 @@ const TOOL_DEFINITIONS = [
         type: 'object',
         properties: {
           description: { type: 'string', description: 'Overall description of the desired image' },
-          model: { type: 'string', description: 'Who is wearing the item, e.g. "a young woman with short dark hair"' },
-          pose: { type: 'string', description: 'How they are posed. Leave blank to keep the pose from the reference image.' },
+          model: {
+            type: 'string',
+            description:
+              'Who is wearing or holding the item, e.g. "a young woman with short dark hair". '
+              + 'Leave as an empty string for a plain product shot with no person. '
+              + 'Do not write "none" or explain why it is absent — the text is used verbatim in the image prompt.',
+          },
+          pose: {
+            type: 'string',
+            description:
+              'How they are posed. Leave as an empty string unless a specific pose is wanted. '
+              + 'Do not write "none" or explain why it is absent — the text is used verbatim in the image prompt.',
+          },
           product: { type: 'string', description: 'The garment or product, e.g. "a heather grey hoodie"' },
           logo: { type: 'string', description: 'What is printed on the item' },
         },
