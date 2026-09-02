@@ -243,6 +243,26 @@ describe('POST /api/admin/ai/edit-image', () => {
     expect(prompt).toContain('shown with the person from the reference image')
   })
 
+  it('terminates the instruction so it does not run into the next sentence', () => {
+    // Without this the prompt read "...still held in his hand Keep everything
+    // else exactly as it is" — one garbled sentence in which the preservation
+    // clause dominated and the requested change was largely ignored.
+    const prompt = composeEditPrompt('move the flag beside him')
+    expect(prompt).toContain('move the flag beside him.')
+    expect(prompt).not.toMatch(/beside him Keep/)
+  })
+
+  it('does not double up terminating punctuation', () => {
+    const prompt = composeEditPrompt('move the flag beside him.')
+    expect(prompt).not.toContain('him..')
+  })
+
+  it('states the change imperatively so it is not treated as background', () => {
+    const prompt = composeEditPrompt('make the background cream')
+    expect(prompt).toMatch(/make this change/i)
+    expect(prompt).toMatch(/clearly visible/i)
+  })
+
   it('refuses an empty instruction', () => {
     expect(() => composeEditPrompt('   ')).toThrow(/instruction/i)
   })
