@@ -263,6 +263,27 @@ describe('POST /api/admin/ai/edit-image', () => {
     expect(prompt).toMatch(/clearly visible/i)
   })
 
+  it('names pose and hands among what to preserve', () => {
+    // "Move the flag beside him" implies a different grip. Without naming
+    // these, the model rebuilt the whole stance rather than moving the flag.
+    const prompt = composeEditPrompt('move the flag beside him')
+    expect(prompt).toMatch(/pose/i)
+    expect(prompt).toMatch(/hands and arms/i)
+  })
+
+  it('asks for a local retouch rather than a new photograph', () => {
+    const prompt = composeEditPrompt('move the flag')
+    expect(prompt).toMatch(/retouch/i)
+    expect(prompt).toMatch(/as locally as possible/i)
+  })
+
+  it('protects text on the artwork from being redrawn', () => {
+    // Each revision regenerates the image, so a wordmark erodes a little
+    // every round — "Blue Mountain" came back as "Blue Montal".
+    const prompt = composeEditPrompt('move the flag')
+    expect(prompt).toMatch(/any text on it/i)
+  })
+
   it('refuses an empty instruction', () => {
     expect(() => composeEditPrompt('   ')).toThrow(/instruction/i)
   })

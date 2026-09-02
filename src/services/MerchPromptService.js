@@ -203,8 +203,16 @@ export function composeEditPrompt(instruction, { originalPrompt = '' } = {}) {
     // and burying it between framing sentences made it easy to drop.
     `Make this change: ${terminated}`,
     'This change must be clearly visible in the result.',
-    'Keep everything else exactly as it is — the same subject, product, framing, '
-      + 'lighting, colours and style. Change only what was asked for.',
+    // Pose, hands and body position are listed explicitly. An instruction
+    // like "move the flag beside him" implies a different grip, and without
+    // naming these the model rebuilt the whole stance — a two-armed overhead
+    // display became a one-handed one at his side. Naming them keeps the
+    // change local unless the instruction is genuinely about the pose.
+    'Keep everything else exactly as it is — the same person, their pose, stance, '
+      + 'facial expression, where their hands and arms are, the same product, '
+      + 'artwork and any text on it, and the same framing, lighting, colours and style.',
+    'Change only what was asked for, and change it as locally as possible: this is a '
+      + 'retouch of the existing photograph, not a new photograph of the same subject.',
   ]
 
   // The original brief, when known, re-states the intent the edit must not
