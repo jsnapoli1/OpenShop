@@ -36,17 +36,49 @@ describe('Merch prompt composition', () => {
     })
 
     expect(prompt).toContain('a grey hoodie')
-    expect(prompt).toContain('worn by a young woman')
+    expect(prompt).toContain('shown with a young woman')
     expect(prompt).toContain('Pose: arms crossed')
     expect(prompt).toContain('Printed on the item: a mountain crest')
   })
 
-  it('keeps the reference pose when pose is blank', () => {
-    const prompt = composeMerchPrompt({ product: 'a tee', model: 'a man', pose: '' })
+  it('keeps the reference pose when pose is blank and an image was supplied', () => {
+    const prompt = composeMerchPrompt(
+      { product: 'a tee', model: 'a man', pose: '' },
+      { hasModelReference: true },
+    )
     expect(prompt).toContain('Keep the pose and framing from the reference image')
   })
 
-  it('does not mention a pose when there is no model', () => {
+  it('does not mention a reference image when none was supplied', () => {
+    // Referring to an image that does not exist invites the generator to
+    // invent one.
+    const prompt = composeMerchPrompt({ product: 'a tee', model: 'a man', pose: '' })
+    expect(prompt).not.toContain('reference image')
+  })
+
+  it('treats an explained "not applicable" as blank', () => {
+    // An LLM does not leave a field empty; it explains itself. Composed
+    // naively this became "It is worn by none - it's a flag...".
+    const prompt = composeMerchPrompt({
+      product: 'a camp flag',
+      model: "none — it's a flag, not worn by a person",
+    })
+    expect(prompt).not.toMatch(/shown with none/i)
+    expect(prompt).not.toMatch(/not worn by a person/i)
+  })
+
+  it('asks for a person when a model image is attached but the field is blank', () => {
+    // Uploading a model image is itself the request for a person.
+    const { prompt } = composeMerchRequest(
+      { product: 'a blue camp flag' },
+      { model: ref() },
+    )
+    expect(prompt).toContain('the person from the reference image')
+    expect(prompt).toContain('lifestyle photograph')
+    expect(prompt).not.toContain('plain uncluttered background')
+  })
+
+  it('does not mention a pose when there is no model at all', () => {
     const prompt = composeMerchPrompt({ product: 'a tee' })
     expect(prompt).not.toContain('Keep the pose')
     expect(prompt).not.toContain('Pose:')
@@ -69,7 +101,7 @@ describe('Merch prompt composition', () => {
     expect(inputs).toHaveLength(2)
     // model comes before logo in REFERENCE_ROLES
     expect(inputs[0].mimeType).toBe('image/jpeg')
-    expect(prompt).toContain('Image 1 is the person who should be wearing the item')
+    expect(prompt).toContain('Image 1 is the person who should appear with the item')
     expect(prompt).toContain('Image 2 is the artwork or logo')
   })
 
