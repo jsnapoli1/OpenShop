@@ -17,7 +17,7 @@
 // pose from the model reference", which is expressed by leaving it blank.
 
 /** Roles a reference image can play, in the order they are described. */
-export const REFERENCE_ROLES = ['model', 'product', 'logo']
+export const REFERENCE_ROLES = ['model', 'product', 'logo', 'style']
 
 /**
  * How many reference images the composed prompt may carry.
@@ -62,7 +62,12 @@ function describeRole(role) {
     case 'product':
       return 'the blank garment or product being sold'
     case 'logo':
-      return 'the artwork or logo to place on the item'
+      // Deliberately not "place on the item": that phrasing produced a flat
+      // transfer of the mark onto a blank garment. The logo is the brand
+      // being expressed, not a sticker.
+      return 'the brand mark — its wordmark, motifs and identity'
+    case 'style':
+      return 'an artistic reference for how the graphic should be drawn'
     default:
       return 'additional reference'
   }
@@ -81,13 +86,15 @@ export function composeMerchPrompt({
   pose = '',
   product = '',
   logo = '',
-} = {}, { hasModelReference = false } = {}) {
+  style = '',
+} = {}, { hasModelReference = false, hasStyleReference = false } = {}) {
   const clauses = []
 
   const cleanModel = meaningful(model)
   const cleanPose = meaningful(pose)
   const cleanProduct = meaningful(product)
   const cleanLogo = meaningful(logo)
+  const cleanStyle = meaningful(style)
   const cleanDescription = meaningful(description)
 
   const subject = cleanProduct || 'the product'
@@ -113,8 +120,31 @@ export function composeMerchPrompt({
     // generator to invent one.
     clauses.push('Keep the pose and framing from the reference image.')
   }
-  if (cleanLogo) {
+  // With an artistic direction, the brand mark is a brief rather than an
+  // asset: "printed on the item: <logo>" produced a flat transfer of the
+  // existing mark, which is not a designed garment graphic.
+  if (cleanLogo && (cleanStyle || hasStyleReference)) {
+    clauses.push(
+      `Design an original garment graphic that expresses this brand: ${cleanLogo}.`,
+    )
+    clauses.push(
+      cleanStyle
+        ? `Draw it in this artistic direction: ${cleanStyle}.`
+        : 'Draw it in the artistic style of the style reference image.',
+    )
+    clauses.push(
+      'Reinterpret the brand in that style — its motifs, wordmark and character '
+        + 'reworked as original apparel artwork, filling the print area as a considered '
+        + 'composition. Do not paste the logo on unchanged.',
+    )
+  } else if (cleanLogo) {
     clauses.push(`Printed on the item: ${cleanLogo}.`)
+  } else if (cleanStyle || hasStyleReference) {
+    clauses.push(
+      cleanStyle
+        ? `The graphic on the item is drawn in this artistic direction: ${cleanStyle}.`
+        : 'The graphic on the item is drawn in the style of the style reference image.',
+    )
   }
   if (cleanDescription) {
     clauses.push(cleanDescription)
@@ -163,6 +193,7 @@ export function composeMerchRequest(fields = {}, references = {}) {
   const ordered = composeReferences(references)
   let prompt = composeMerchPrompt(fields, {
     hasModelReference: ordered.some((r) => r.role === 'model'),
+    hasStyleReference: ordered.some((r) => r.role === 'style'),
   })
 
   if (ordered.length > 0) {

@@ -44,9 +44,16 @@ const DESIGN_FIELDS = [
   },
   {
     key: 'logo',
-    label: 'Logo',
-    placeholder: 'the camp crest, centred on the chest',
-    help: 'What goes on the merch',
+    label: 'Logo / brand',
+    placeholder: 'Blue Mountain Cross Country Camp, est. 1969',
+    help: 'The brand to express — attach the mark itself',
+    image: true,
+  },
+  {
+    key: 'style',
+    label: 'Artistic style',
+    placeholder: 'vintage screenprint, halftone texture, muted palette',
+    help: 'How the graphic is drawn. With this set, the brand is redrawn in this style rather than pasted on.',
     image: true,
   },
 ]
@@ -84,7 +91,7 @@ export function AgentChat() {
   const [selectedModel, setSelectedModel] = useState('')
   const [configured, setConfigured] = useState(true)
   const [showDesigner, setShowDesigner] = useState(false)
-  const [design, setDesign] = useState({ model: '', pose: '', product: '', logo: '' })
+  const [design, setDesign] = useState({ model: '', pose: '', product: '', logo: '', style: '' })
   const [references, setReferences] = useState({})
   const scrollRef = useRef(null)
 
@@ -181,6 +188,7 @@ export function AgentChat() {
     if (design.model.trim()) parts.push(`Model: ${design.model.trim()}`)
     if (design.pose.trim()) parts.push(`Pose: ${design.pose.trim()}`)
     if (design.logo.trim()) parts.push(`Logo: ${design.logo.trim()}`)
+    if (design.style.trim()) parts.push(`Artistic style: ${design.style.trim()}`)
     const attached = Object.keys(references)
     if (attached.length) parts.push(`Reference images attached for: ${attached.join(', ')}`)
     return parts.join('. ')

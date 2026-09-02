@@ -66,14 +66,14 @@ router.post('/generate-image', asyncHandler(async (c) => {
  */
 router.post('/generate-merch-image', asyncHandler(async (c) => {
   const body = await c.req.json()
-  const { description, model, pose, product, logo, references } = body || {}
+  const { description, model, pose, product, logo, style, references } = body || {}
 
   if (!description && !product) {
     throw new ValidationError('Describe the product, or name it in the product field')
   }
 
   const { prompt, inputs } = composeMerchRequest(
-    { description, model, pose, product, logo },
+    { description, model, pose, product, logo, style },
     references || {},
   )
 
