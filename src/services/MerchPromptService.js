@@ -191,9 +191,18 @@ export function composeEditPrompt(instruction, { originalPrompt = '' } = {}) {
     throw new Error('An edit needs an instruction')
   }
 
+  // Terminate the instruction so it does not run into the next sentence.
+  // Without this the prompt read "...still held in his hand Keep everything
+  // else exactly as it is", one garbled sentence in which the preservation
+  // clause dominated and the requested change was largely ignored.
+  const terminated = /[.!?]$/.test(clean) ? clean : `${clean}.`
+
   const clauses = [
     'Revise the attached image.',
-    `Change: ${clean}`,
+    // Stated first and imperatively: the edit is the point of the request,
+    // and burying it between framing sentences made it easy to drop.
+    `Make this change: ${terminated}`,
+    'This change must be clearly visible in the result.',
     'Keep everything else exactly as it is — the same subject, product, framing, '
       + 'lighting, colours and style. Change only what was asked for.',
   ]
