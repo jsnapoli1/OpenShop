@@ -133,11 +133,17 @@ export class StripeService {
   }
 
   /**
-   * Archive a Stripe product
+   * Archive a Stripe product.
+   *
+   * Placeholder ids are skipped even when a key *is* configured. A product
+   * created in catalogue-only mode carries `prod_unlinked`, which Stripe has
+   * never heard of; once a key is added, archiving it 404s and the throw
+   * propagates out of the delete route before the KV row is removed —
+   * leaving the product permanently undeletable through the API.
    */
   async archiveProduct(productId) {
-    if (this.skipsRemoteSync) {
-      this.warnSkip()
+    if (this.skipsRemoteSync || productId === UNLINKED_PRODUCT_ID) {
+      if (this.skipsRemoteSync) this.warnSkip()
       return { id: productId, active: false }
     }
     return await this.stripe.products.update(productId, { active: false })
@@ -161,11 +167,14 @@ export class StripeService {
   }
 
   /**
-   * Archive a Stripe price
+   * Archive a Stripe price.
+   *
+   * Skips the placeholder id for the same reason as archiveProduct: it does
+   * not exist in Stripe, and letting the 404 throw blocks the delete.
    */
   async archivePrice(priceId) {
-    if (this.skipsRemoteSync) {
-      this.warnSkip()
+    if (this.skipsRemoteSync || priceId === UNLINKED_PRICE_ID) {
+      if (this.skipsRemoteSync) this.warnSkip()
       return { id: priceId, active: false }
     }
     return await this.stripe.prices.update(priceId, { active: false })
