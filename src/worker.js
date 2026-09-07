@@ -64,24 +64,36 @@ app.get('*', async (c) => {
   }
   
   try {
-    // Try to serve the requested file first
-    if (pathname !== '/' && !pathname.startsWith('/admin') && !pathname.startsWith('/collections') && !pathname.startsWith('/products') && !pathname.startsWith('/success')) {
-      const asset = await c.env.ASSETS.fetch(c.req)
+    // Try to serve the requested file first. Anything with a file extension
+    // is a real asset request; everything else is a client-side route, and
+    // asking the binding for it only costs a round trip before the fallback.
+    //
+    // This used to be a whitelist of known SPA prefixes, which silently broke
+    // every route not on it: /product/<id> (the links the camp site builds),
+    // /cart and /checkout all 500'd, because the list said "/products".
+    if (pathname !== '/' && /\.[^/]+$/.test(pathname)) {
+      const asset = await c.env.ASSETS.fetch(c.req.raw)
       if (asset.ok) {
         return asset
       }
     }
-    
-    // For SPA routes (/admin, /collections, etc.) or root, serve index.html
+
+    // Serve the SPA shell for client-side routes.
+    //
+    // Request '/', not '/index.html': the assets runtime 307-redirects
+    // '/index.html' to '/' to normalise away the implicit index filename, and
+    // a 307 is not `.ok`, so asking for it by name threw on every request and
+    // rendered the "assets could not be loaded" page below — while the assets
+    // themselves were being served perfectly well.
     const indexUrl = new URL(c.req.url)
-    indexUrl.pathname = '/index.html'
-    const indexRequest = new Request(indexUrl, c.req)
+    indexUrl.pathname = '/'
+    const indexRequest = new Request(indexUrl, c.req.raw)
     const indexAsset = await c.env.ASSETS.fetch(indexRequest)
-    
+
     if (indexAsset.ok) {
       return indexAsset
     } else {
-      throw new Error('index.html not found')
+      throw new Error(`SPA shell fetch failed with ${indexAsset.status}`)
     }
   } catch (error) {
     console.error('Error serving static asset:', error, 'for path:', pathname)
