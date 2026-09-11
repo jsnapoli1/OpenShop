@@ -133,11 +133,11 @@ describe('POST /api/admin/ai/generate-merch-image', () => {
   })
 
   it('reports a storage failure without blaming generation', async () => {
-    env.GEMINI_API_KEY = 'k'
+    env.OPENROUTER_API_KEY = 'k'
     delete env.IMAGES // no R2 bucket bound
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
-      JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { data: PIXEL, mimeType: 'image/png' } }] } }] }),
+      JSON.stringify({ data: [{ b64_json: PIXEL, media_type: 'image/png' }] }),
       { status: 200, headers: { 'content-type': 'application/json' } },
     ))
 

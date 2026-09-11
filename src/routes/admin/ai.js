@@ -70,23 +70,16 @@ router.post('/generate-merch-image', asyncHandler(async (c) => {
   )
 
   const kv = getKVNamespace(c.env)
-  const [provider, geminiApiKey, openRouterApiKey, geminiModel, openRouterModel, siteUrl] =
-    await Promise.all([
-      resolveSetting(kv, c.env, 'IMAGE_PROVIDER'),
-      resolveSetting(kv, c.env, 'GEMINI_API_KEY'),
-      resolveSetting(kv, c.env, 'OPENROUTER_API_KEY'),
-      resolveSetting(kv, c.env, 'GEMINI_IMAGE_MODEL'),
-      resolveSetting(kv, c.env, 'OPENROUTER_IMAGE_MODEL'),
-      resolveSetting(kv, c.env, 'SITE_URL'),
-    ])
+  const [openRouterApiKey, openRouterModel, siteUrl] = await Promise.all([
+    resolveSetting(kv, c.env, 'OPENROUTER_API_KEY'),
+    resolveSetting(kv, c.env, 'OPENROUTER_IMAGE_MODEL'),
+    resolveSetting(kv, c.env, 'SITE_URL'),
+  ])
 
   let image
   try {
     image = await generateImage({
-      provider,
-      geminiApiKey,
       openRouterApiKey,
-      geminiModel,
       openRouterModel,
       prompt,
       inputs,
