@@ -6,9 +6,10 @@ Guide to optional AI image generation and Google Drive integration features in O
 
 OpenShop includes optional integrations for AI-powered image generation and Google Drive storage. These features enhance the admin experience but are not required for core functionality.
 
-## Gemini Image Generation
+## AI Image Generation
 
-Generate product or hero images directly from the admin dashboard using Google's Gemini image generation API.
+Generate product or hero images directly from the admin dashboard using
+OpenRouter's image generation API.
 
 ### What It Does
 
@@ -18,22 +19,13 @@ From the admin media picker, you can:
 - Generate hero banner images for collections
 - Create custom images without leaving the admin
 
-### Providers
+### Provider
 
-Image generation runs through one of two providers, set by `IMAGE_PROVIDER`
-in **Developer Settings**:
-
-**`gemini`** (default) — talks to Google directly. The cheapest route to
-Nano Banana 2, since OpenRouter charges the same token rate but adds a ~5.5%
-fee on credit purchases. Needs `GEMINI_API_KEY`. Model is
-`gemini-3.1-flash-image`, overridable with `GEMINI_IMAGE_MODEL`.
-
-**`openrouter`** — reaches ~48 image models from ByteDance, Black Forest
-Labs, Qwen, Recraft, Sourceful and Google behind one key. Needs
-`OPENROUTER_API_KEY`. Model is `google/gemini-3.1-flash-image`, overridable
-with `OPENROUTER_IMAGE_MODEL`.
-
-With no explicit provider, whichever key is present is used.
+Image generation runs through **OpenRouter**, which reaches ~48 image models
+from ByteDance, Black Forest Labs, Qwen, Recraft, Sourceful and Google behind
+one key. Needs `OPENROUTER_API_KEY`. The default model is
+`google/gemini-3.1-flash-image`, overridable with `OPENROUTER_IMAGE_MODEL`
+(in **Developer Settings**, or as a Worker env var/secret).
 
 **Choosing a model.** Approximate per-image list prices, all supporting at
 least the 4 reference images the admin UI sends:
@@ -56,21 +48,24 @@ only one.
 
 ### Setup
 
-1. **Get Gemini API Key**
-   - Visit [Google AI Studio](https://ai.google.dev/)
-   - Create an API key for Gemini
+1. **Get an OpenRouter API Key**
+   - Visit [openrouter.ai](https://openrouter.ai/)
+   - Create an API key
 
 2. **Configure in OpenShop**
 
    **Local Development** (`.env` file):
    ```env
-   GEMINI_API_KEY=your_gemini_api_key
+   OPENROUTER_API_KEY=your_openrouter_api_key
    ```
 
    **Production**:
    ```bash
-   wrangler secret put GEMINI_API_KEY
+   wrangler secret put OPENROUTER_API_KEY
    ```
+
+   Or set it without redeploying from the admin panel under
+   **Developer Settings**.
 
 3. **Access in Admin**
    - Navigate to admin dashboard
@@ -230,7 +225,7 @@ Content-Type: multipart/form-data
 
 You can use both features together:
 
-1. **Generate** image with Gemini AI
+1. **Generate** image with OpenRouter AI
 2. **Upload** generated image to Google Drive
 3. **Use** Drive URL in your product/collection
 
@@ -238,10 +233,10 @@ This workflow provides a complete image management solution without external too
 
 ## Troubleshooting
 
-### Gemini Issues
+### Image Generation Issues
 
 **Issue**: Image generation fails
-- **Solution**: Verify `GEMINI_API_KEY` is set correctly and has sufficient quota
+- **Solution**: Verify `OPENROUTER_API_KEY` is set correctly and has sufficient credits
 
 **Issue**: Generated images are low quality
 - **Solution**: Use more detailed prompts and reference images
@@ -268,7 +263,7 @@ For more help, see the [Troubleshooting Guide](TROUBLESHOOTING.md).
 - **Naming Conventions**: Use descriptive filenames for easier management
 - **Folder Organization**: Keep products and collections organized in Drive
 - **Backup**: Regularly backup your Drive folder
-- **Cost Management**: Monitor API usage for Gemini and Drive storage
+- **Cost Management**: Monitor API usage for OpenRouter and Drive storage
 
 ## Feature Availability
 

@@ -1,7 +1,6 @@
-// Admin AI routes (image generation).
+// Admin AI routes (image generation via OpenRouter).
 //
-// The provider is configurable: Gemini directly, or OpenRouter for access to
-// other vendors' models under one key. See ImageGenerationService.
+// See ImageGenerationService.
 import { Hono } from 'hono'
 import { asyncHandler } from '../../middleware/errorHandler.js'
 import { ValidationError, APIError } from '../../utils/errors.js'
@@ -22,22 +21,15 @@ router.post('/generate-image', asyncHandler(async (c) => {
   }
 
   const kv = getKVNamespace(c.env)
-  const [provider, geminiApiKey, openRouterApiKey, geminiModel, openRouterModel, siteUrl] =
-    await Promise.all([
-      resolveSetting(kv, c.env, 'IMAGE_PROVIDER'),
-      resolveSetting(kv, c.env, 'GEMINI_API_KEY'),
-      resolveSetting(kv, c.env, 'OPENROUTER_API_KEY'),
-      resolveSetting(kv, c.env, 'GEMINI_IMAGE_MODEL'),
-      resolveSetting(kv, c.env, 'OPENROUTER_IMAGE_MODEL'),
-      resolveSetting(kv, c.env, 'SITE_URL'),
-    ])
+  const [openRouterApiKey, openRouterModel, siteUrl] = await Promise.all([
+    resolveSetting(kv, c.env, 'OPENROUTER_API_KEY'),
+    resolveSetting(kv, c.env, 'OPENROUTER_IMAGE_MODEL'),
+    resolveSetting(kv, c.env, 'SITE_URL'),
+  ])
 
   try {
     const image = await generateImage({
-      provider,
-      geminiApiKey,
       openRouterApiKey,
-      geminiModel,
       openRouterModel,
       prompt,
       inputs,

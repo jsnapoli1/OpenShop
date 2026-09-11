@@ -1,22 +1,13 @@
-// Image generation, over either the Gemini API directly or OpenRouter.
+// Image generation via OpenRouter.
 //
-// Two providers rather than one, because they are good at different things:
+// OpenRouter reaches ~48 image models across ByteDance, Black Forest Labs,
+// Qwen, Recraft, Sourceful and Google behind one key, so a store can pick a
+// cheaper or better-suited model without opening a billing relationship with
+// each vendor. Needs OPENROUTER_API_KEY.
 //
-// - **gemini** talks to Google directly. Cheapest route to Nano Banana 2,
-//   since OpenRouter's token rate matches Google's but its credit purchases
-//   carry a ~5.5% fee. Needs GEMINI_API_KEY.
-// - **openrouter** reaches ~48 image models across ByteDance, Black Forest,
-//   Qwen, Recraft, Sourceful and Google behind one key. Useful for trying a
-//   cheaper or better-suited model without opening a billing relationship
-//   with each vendor. Needs OPENROUTER_API_KEY.
-//
-// Both return { mimeType, dataBase64 }, so the admin UI does not care which
-// one served the request.
+// Returns { mimeType, dataBase64 }.
 
-/** Default when nothing is configured. GA, and strong on product imagery. */
-export const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-image'
-
-/** Default OpenRouter model. Same underlying model as the Gemini default. */
+/** Default when nothing is configured. Strong on product imagery. */
 export const DEFAULT_OPENROUTER_MODEL = 'google/gemini-3.1-flash-image'
 
 /**
@@ -40,49 +31,6 @@ function normaliseReferences(inputs) {
   return inputs
     .slice(0, MAX_REFERENCE_IMAGES)
     .filter((item) => item && item.dataBase64 && item.mimeType)
-}
-
-/**
- * Generate via Google's Gemini API.
- *
- * gemini-2.5-flash-image-preview, which this endpoint used to name, was shut
- * down on 2026-01-15; requests to it fail outright.
- */
-async function generateWithGemini({ apiKey, model, prompt, references }) {
-  const parts = [{ text: prompt }]
-  for (const item of references) {
-    parts.push({
-      inline_data: { mime_type: item.mimeType, data: item.dataBase64 },
-    })
-  }
-
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts }] }),
-  })
-
-  if (!res.ok) {
-    const detail = await res.text()
-    console.error('Gemini API error', res.status, detail)
-    throw new ImageGenerationError(`Gemini API failed: ${detail}`, 502)
-  }
-
-  const data = await res.json()
-  for (const candidate of data?.candidates || []) {
-    for (const part of candidate?.content?.parts || []) {
-      const inline = part?.inlineData || part?.inline_data
-      if (inline?.data) {
-        return {
-          dataBase64: inline.data,
-          mimeType: inline.mimeType || inline.mime_type || 'image/png',
-        }
-      }
-    }
-  }
-
-  throw new ImageGenerationError('No image returned from Gemini', 502)
 }
 
 /**
@@ -134,56 +82,29 @@ async function generateWithOpenRouter({ apiKey, model, prompt, references, siteU
 }
 
 /**
- * Generate an image with whichever provider is configured.
+ * Generate an image via OpenRouter.
+ *
+ * `provider` and the Gemini-specific keys are accepted and ignored so
+ * existing settings in KV stay harmless until cleared.
  *
  * @returns {Promise<{ mimeType: string, dataBase64: string }>}
  */
 export async function generateImage({
-  provider,
-  geminiApiKey,
+  provider, // eslint-disable-line no-unused-vars
   openRouterApiKey,
-  geminiModel,
   openRouterModel,
   prompt,
   inputs,
   siteUrl,
 }) {
-  const references = normaliseReferences(inputs)
-
-  // Explicit choice wins. Otherwise prefer whichever key exists, so a store
-  // that has only ever set one of them just works.
-  let resolved = provider
-  if (resolved !== 'gemini' && resolved !== 'openrouter') {
-    resolved = geminiApiKey ? 'gemini' : (openRouterApiKey ? 'openrouter' : null)
+  if (!openRouterApiKey) {
+    throw new ImageGenerationError('OPENROUTER_API_KEY is not configured. Add it in Developer Settings.', 400)
   }
-
-  if (resolved === 'gemini') {
-    if (!geminiApiKey) {
-      throw new ImageGenerationError('GEMINI_API_KEY is not configured', 400)
-    }
-    return generateWithGemini({
-      apiKey: geminiApiKey,
-      model: geminiModel || DEFAULT_GEMINI_MODEL,
-      prompt,
-      references,
-    })
-  }
-
-  if (resolved === 'openrouter') {
-    if (!openRouterApiKey) {
-      throw new ImageGenerationError('OPENROUTER_API_KEY is not configured', 400)
-    }
-    return generateWithOpenRouter({
-      apiKey: openRouterApiKey,
-      model: openRouterModel || DEFAULT_OPENROUTER_MODEL,
-      prompt,
-      references,
-      siteUrl,
-    })
-  }
-
-  throw new ImageGenerationError(
-    'Image generation is not configured. Add a Gemini or OpenRouter API key in Developer Settings.',
-    400,
-  )
+  return generateWithOpenRouter({
+    apiKey: openRouterApiKey,
+    model: openRouterModel || DEFAULT_OPENROUTER_MODEL,
+    prompt,
+    references: normaliseReferences(inputs),
+    siteUrl,
+  })
 }
